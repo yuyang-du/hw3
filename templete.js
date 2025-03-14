@@ -97,21 +97,19 @@ d3.csv("socialMedia.csv").then(function(data) {
   });
 });
 
-/*****************************************************
- * PART 2.2: SIDE-BY-SIDE BAR PLOT
- *****************************************************/
+// PART 2.2: SIDE-BY-SIDE BAR PLOT
 d3.csv("socialMediaAvg.csv").then(function(data) {
   // Convert string values to numbers
   data.forEach(d => {
     d.AvgLikes = +d.AvgLikes;
   });
 
-  // Define dimensions and margins
-  const margin = { top: 40, right: 30, bottom: 50, left: 60 },
+  // Increase right margin to leave room for legend
+  const margin = { top: 40, right: 120, bottom: 50, left: 60 },
         width  = 600 - margin.left - margin.right,
         height = 400 - margin.top - margin.bottom;
 
-  // Create the SVG container in the div with id "barplot"
+  // Create the SVG container
   const svg = d3.select("#barplot")
     .append("svg")
     .attr("width",  width  + margin.left + margin.right)
@@ -123,23 +121,25 @@ d3.csv("socialMediaAvg.csv").then(function(data) {
   const platforms = [...new Set(data.map(d => d.Platform))];
   const postTypes = [...new Set(data.map(d => d.PostType))];
 
-  // Define x0 scale for platforms and x1 scale for post types within each platform
+  // x0 scale for platforms
   const x0 = d3.scaleBand()
     .domain(platforms)
     .range([0, width])
     .padding(0.2);
+
+  // x1 scale for post types
   const x1 = d3.scaleBand()
     .domain(postTypes)
     .range([0, x0.bandwidth()])
     .padding(0.05);
 
-  // Define y scale for average likes
+  // y scale for average likes
   const y = d3.scaleLinear()
     .domain([0, d3.max(data, d => d.AvgLikes)])
     .range([height, 0])
     .nice();
 
-  // Define a color scale for post types
+  // color scale
   const color = d3.scaleOrdinal()
     .domain(postTypes)
     .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]);
@@ -151,7 +151,7 @@ d3.csv("socialMediaAvg.csv").then(function(data) {
   svg.append("g")
     .call(d3.axisLeft(y));
 
-  // Optional axis labels
+  // Axis labels
   svg.append("text")
     .attr("x", width / 2)
     .attr("y", height + margin.bottom - 5)
@@ -164,7 +164,7 @@ d3.csv("socialMediaAvg.csv").then(function(data) {
     .style("text-anchor", "middle")
     .text("Average Likes");
 
-  // Create a group for each platform
+  // Draw grouped bars
   const barGroups = svg.selectAll(".barGroup")
     .data(platforms)
     .enter()
@@ -172,7 +172,6 @@ d3.csv("socialMediaAvg.csv").then(function(data) {
     .attr("class", "barGroup")
     .attr("transform", d => `translate(${x0(d)}, 0)`);
 
-  // Within each group, draw one rectangle per post type
   barGroups.selectAll("rect")
     .data(d => data.filter(item => item.Platform === d))
     .enter()
@@ -183,16 +182,20 @@ d3.csv("socialMediaAvg.csv").then(function(data) {
     .attr("height", d => height - y(d.AvgLikes))
     .attr("fill", d => color(d.PostType));
 
-  // Add a legend
+  // Position legend so it doesn't overlap
   const legend = svg.append("g")
-    .attr("transform", `translate(${width - 150}, ${margin.top - 30})`);
+    .attr("transform", `translate(${width + 10}, 20)`);
+
   postTypes.forEach((type, i) => {
+    // small colored square
     legend.append("rect")
       .attr("x", 0)
       .attr("y", i * 20)
       .attr("width", 15)
       .attr("height", 15)
       .attr("fill", color(type));
+
+    // text label
     legend.append("text")
       .attr("x", 20)
       .attr("y", i * 20 + 12)
@@ -201,54 +204,70 @@ d3.csv("socialMediaAvg.csv").then(function(data) {
   });
 });
 
-/*****************************************************
- * PART 2.3: LINE PLOT
- *****************************************************/
+// PART 2.3: LINE PLOT
 d3.csv("socialMediaTime.csv").then(function(data) {
-  // Convert string values to numbers
+  // 1) Convert "AvgLikes" to number
   data.forEach(d => {
     d.AvgLikes = +d.AvgLikes;
   });
 
-  // Define margins and dimensions
+  // 2) Parse date strings into real Date objects
+  // If your CSV has "3/1/2024", use the appropriate format string in timeParse
+  const parseDate = d3.timeParse("%m/%d/%Y"); 
+  // If you only have "3/1" without a year, you can do:
+  // const parseDate = d3.timeParse("%m/%d");
+  
+  data.forEach(d => {
+    d.parsedDate = parseDate(d.date);
+  });
+
+  // 3) Define margins and dimensions
   const margin = { top: 40, right: 30, bottom: 50, left: 60 },
         width  = 600 - margin.left - margin.right,
         height = 400 - margin.top - margin.bottom;
 
-  // Create the SVG container in the div with id "lineplot"
+  // 4) Create SVG
   const svg = d3.select("#lineplot")
     .append("svg")
     .attr("width",  width  + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
+    .attr("height", height + margin.top  + margin.bottom)
     .append("g")
     .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
-  // Set up scales: x for date (treating dates as categories) and y for AvgLikes
-  const xScale = d3.scaleBand()
-    .domain(data.map(d => d.date))
-    .range([0, width])
-    .padding(0.2);
+  // 5) Define scales
+  // xScale: a time scale from the earliest to latest date
+  const xScale = d3.scaleTime()
+    .domain(d3.extent(data, d => d.parsedDate))
+    .range([0, width]);
+
   const yScale = d3.scaleLinear()
     .domain([0, d3.max(data, d => d.AvgLikes)])
     .range([height, 0])
     .nice();
 
-  // Add axes
+  // 6) Add axes
+  // We'll format the x-axis to show month/day
+  const xAxis = d3.axisBottom(xScale)
+    .tickFormat(d3.timeFormat("%m/%d")); 
+  // or use .tickFormat(d3.timeFormat("%b %d")) for "Mar 01" style
+
   svg.append("g")
     .attr("transform", `translate(0, ${height})`)
-    .call(d3.axisBottom(xScale))
+    .call(xAxis)
     .selectAll("text")
     .attr("transform", "rotate(-45)")
     .style("text-anchor", "end");
+
   svg.append("g")
     .call(d3.axisLeft(yScale));
 
-  // Optional axis labels
+  // (Optional) axis labels
   svg.append("text")
     .attr("x", width / 2)
     .attr("y", height + margin.bottom - 5)
     .style("text-anchor", "middle")
     .text("Date");
+
   svg.append("text")
     .attr("transform", "rotate(-90)")
     .attr("x", -height / 2)
@@ -256,13 +275,13 @@ d3.csv("socialMediaTime.csv").then(function(data) {
     .style("text-anchor", "middle")
     .text("Average Likes");
 
-  // Create a line generator with a smooth curve
+  // 7) Create a line generator
   const lineGenerator = d3.line()
-    .x(d => xScale(d.date) + xScale.bandwidth() / 2)
+    .x(d => xScale(d.parsedDate))
     .y(d => yScale(d.AvgLikes))
     .curve(d3.curveNatural);
 
-  // Draw the line path
+  // 8) Draw the line path
   svg.append("path")
     .datum(data)
     .attr("fill", "none")
@@ -270,12 +289,12 @@ d3.csv("socialMediaTime.csv").then(function(data) {
     .attr("stroke-width", 2)
     .attr("d", lineGenerator);
 
-  // (Optional) Draw circles at each data point
+  // 9) (Optional) Draw circles at data points
   svg.selectAll(".dot")
     .data(data)
     .enter()
     .append("circle")
-    .attr("cx", d => xScale(d.date) + xScale.bandwidth() / 2)
+    .attr("cx", d => xScale(d.parsedDate))
     .attr("cy", d => yScale(d.AvgLikes))
     .attr("r", 4)
     .attr("fill", "#ff7f0e");
