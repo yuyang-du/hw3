@@ -204,53 +204,42 @@ d3.csv("socialMediaAvg.csv").then(function(data) {
   });
 });
 
-/*****************************************************
- * PART 2.3: LINE PLOT
- *****************************************************/
 d3.csv("socialMediaTime.csv").then(function(data) {
-  // 1) Convert AvgLikes to numeric
   data.forEach(d => {
     d.AvgLikes = +d.AvgLikes;
   });
 
-  // 2) Parse "3/1/2024 (Friday)" into a real Date object
-  // EXACT format string must match your CSV
+  // Adjust format to match "3/1/2024 (Friday)"
   const parseDate = d3.timeParse("%m/%d/%Y (%A)");
 
   data.forEach(d => {
-    d.parsedDate = parseDate(d.Date); 
-    // If parse fails, d.parsedDate will be null
+    d.parsedDate = parseDate(d.Date);
   });
 
-  // 3) Dimensions
   const margin = { top: 40, right: 30, bottom: 50, left: 60 },
         width  = 600 - margin.left - margin.right,
         height = 400 - margin.top - margin.bottom;
 
-  // 4) Create the SVG container in the div with id="lineplot"
   const svg = d3.select("#lineplot")
     .append("svg")
-    .attr("width", width + margin.left + margin.right)
+    .attr("width",  width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom)
     .append("g")
     .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
-  // 5) Create a time scale for the x-axis
   const xScale = d3.scaleTime()
-    .domain(d3.extent(data, d => d.parsedDate)) // from earliest to latest date
+    .domain(d3.extent(data, d => d.parsedDate))
     .range([0, width]);
 
-  // 6) Create a linear scale for AvgLikes
   const yScale = d3.scaleLinear()
     .domain([0, d3.max(data, d => d.AvgLikes)])
     .range([height, 0])
     .nice();
 
-  // 7) Create and add the axes
-  // We'll format the x-axis as month/day
+  // Use tickValues to only show each data date exactly once
   const xAxis = d3.axisBottom(xScale)
-    .tickFormat(d3.timeFormat("%m/%d")); // e.g., "03/01"
-    // You can also use "%b %d" for "Mar 01"
+    .tickValues(data.map(d => d.parsedDate))  // Only label these exact dates
+    .tickFormat(d3.timeFormat("%m/%d"));      // e.g., "03/01"
 
   svg.append("g")
     .attr("transform", `translate(0, ${height})`)
@@ -262,7 +251,7 @@ d3.csv("socialMediaTime.csv").then(function(data) {
   svg.append("g")
     .call(d3.axisLeft(yScale));
 
-  // (Optional) Axis labels
+  // Axis labels
   svg.append("text")
     .attr("x", width / 2)
     .attr("y", height + margin.bottom - 5)
@@ -276,21 +265,20 @@ d3.csv("socialMediaTime.csv").then(function(data) {
     .style("text-anchor", "middle")
     .text("Average Likes");
 
-  // 8) Create a line generator
-  const lineGenerator = d3.line()
+  // Line generator
+  const line = d3.line()
     .x(d => xScale(d.parsedDate))
     .y(d => yScale(d.AvgLikes))
     .curve(d3.curveNatural);
 
-  // 9) Draw the line path
   svg.append("path")
     .datum(data)
     .attr("fill", "none")
     .attr("stroke", "#ff7f0e")
     .attr("stroke-width", 2)
-    .attr("d", lineGenerator);
+    .attr("d", line);
 
-  // 10) (Optional) Draw circles at each data point
+  // Circles
   svg.selectAll(".dot")
     .data(data)
     .enter()
@@ -300,4 +288,3 @@ d3.csv("socialMediaTime.csv").then(function(data) {
     .attr("r", 4)
     .attr("fill", "#ff7f0e");
 });
-
